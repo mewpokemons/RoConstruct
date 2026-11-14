@@ -1,6 +1,6 @@
 // native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /D_AFXDLL /DNDEBUG /D_MBCS /fp:fast
 // 2008-06 native RBX::Primitive state setters of v8world/Primitive.cpp, application range 005e8000.. (inactive):
-// getNextJoint 005e7ba0, getNextContact 005e7be0, setDragging 005e8050, setAnchor 005e80d0, clipToSafeSize 005e83c0,
+// getNextJoint 005e7ba0, getNextContact 005e7be0, setDragging 005e8050, setAnchor 005e80d0, setJointAnchored 005e8140, clipToSafeSize 005e83c0,
 // setGridSize 005e8470 and setPV 005e85b0.
 // Flags: the sibling rows of native-classes/AppUnit5E4Primitive.cpp (/fp:fast).
 //
@@ -11,10 +11,9 @@
 //     setCoordinateFrame, setPV, setGridSize, clipToSafeSize, and setMassInertia 005e8000 (called by setGridSize).
 //   - RBX::World, copied from native-headers/v8world/World2008.h (no fields), plus the four notifications these
 //     bodies call (005e91c0, 005e94a0, 005e94e0; names from the donor v8world/World.h by call site and order).
-//   - RBX::Edge copied from native-classes/EdgeListInsert.cpp (native-headers/AppUnit658/Edge.h plus the inline
-//     getIndex accessor that header lacks), RBX::Joint copied from native-headers/v8world/Joints2008.h and RBX::Contact
-//     copied from native-headers/v8world/Contact2008.h (both headers include the donor v8world/Edge.h, which cannot sit
-//     next to v8kernel/IPipelined2008.h), for getNextJoint 005e7ba0 / getNextContact 005e7be0.
+// RBX::Edge (getIndex), RBX::Joint and RBX::Contact for getNextJoint 005e7ba0 / getNextContact 005e7be0 come from
+// native-headers/AppUnit658/Edge.h, v8world/Joints2008.h and v8world/Contact2008.h (native 2008 Edge over
+// IPipelined2008.h), which replaced the earlier unit-local copies.
 // Parked (declarations missing from read-only headers, see the batch result): getAssembly 005e7570 and
 // setCoordinateFrame 005e8200 read the 2008 Clump (+0x24 assembly) and Assembly (+0x24 -> +0x1c root primitive,
 // notifyMoved 005e6170), which no native header declares (the donor Clump.h puts assembly at +0x20; the native-world
@@ -36,9 +35,9 @@
 #include "util/ComputeProp.h"
 #include "util/NormalId.h"
 #include "util/PV.h"
-
-struct NativeWorldJointsLayout;
-struct NativeWorldShapesLayout;
+#include "AppUnit658/Edge.h"
+#include "v8world/Joints2008.h"
+#include "v8world/Contact2008.h"
 
 namespace RBX
 {
@@ -210,201 +209,14 @@ namespace RBX
 
 		// Not in Primitive2008.h (proposal); decorated signatures from work/2008-06/identity-registry.json.
 		void setAnchor(bool _anchored);                  // 005e80d0 ?setAnchor@Primitive@RBX@@QAEX_N@Z
+		// Not in Primitive2008.h (proposal): the +0xaa sibling of setDragging / setAnchor (analog name; placeholder
+		// func_005e8140 in the registry, caller HumanoidStates3.cpp evidence: torso primitive 005e8140(false)).
+		void setJointAnchored(bool _jointAnchored);      // 005e8140
 		void setCoordinateFrame(const G3D::CoordinateFrame& value);   // 005e8200
 		void setPV(const PV& pv);                        // 005e85b0 ?setPV@Primitive@RBX@@QAEXABVPV@2@@Z
 		void setMassInertia(float mass);                 // 005e8000 (donor name; Body::setMass 006140b0 /
 		                                                 // setMoment 00614110 of geometry slot 6 getMoment)
 		void setGridSize(const G3D::Vector3& gridSize);  // 005e8470 ?setGridSize@Primitive@RBX@@QAEXABVVector3@G3D@@@Z
-	};
-
-	namespace Sim
-	{
-		enum EdgeState
-		{
-			UNDEFINED,
-			STEPPING,
-			SLEEPING,
-			TOUCHING,
-			TOUCHING_SLEEPING
-		};
-	}
-
-	// Copied from native-classes/EdgeListInsert.cpp (see the header comment of this unit).
-	class __declspec(novtable) Edge : public IPipelined
-	{
-	public:
-		enum EdgeType
-		{
-			JOINT,
-			CONTACT
-		};
-
-	private:
-		Sim::EdgeState edgeState;                      // +0x8
-		Primitive* prim0;                              // +0xc
-		Primitive* prim1;                              // +0x10
-		int index0;                                    // +0x14 (index in prim0's EdgeList, -1 = none)
-		int index1;                                    // +0x18 (index in prim1's EdgeList, -1 = none)
-		bool inEdgeList;                               // +0x1c
-
-	public:
-		Edge(Primitive* prim0, Primitive* prim1);      // 00659260
-		virtual ~Edge() {}                             // slot 0
-
-		virtual EdgeType getEdgeType() const = 0;      // slot 3
-		virtual void setPrimitive(int i, Primitive* p);   // slot 4 (00659290)
-
-		// Not in AppUnit658/Edge.h (proposal); inlined in 005e7ba0 / 005e7be0 / 005e8610 / 005e8990.
-		int getIndex(const Primitive* p) const
-		{
-			return p == prim0 ? index0 : index1;
-		}
-	};
-
-	// Copied from native-headers/v8world/Joints2008.h.
-	class Joint : public Edge
-	{
-		friend struct ::NativeWorldJointsLayout; // tests/NativeWorldJointsLayout.cpp offset asserts
-
-	public:
-		enum JointType
-		{
-			NO_JOINT,          // 00416690 (Joint / RigidJoint / MultiJoint slot 5)
-			ROTATE_JOINT,      // RotateJoint slot 5 007286a0 `mov eax, 1`
-			ROTATE_P_JOINT,    // RotatePJoint slot 5 0077d810 `mov eax, 2`
-			ROTATE_V_JOINT,    // RotateVJoint slot 5 005e2790 `mov eax, 3`
-			GLUE_JOINT,        // GlueJoint slot 5 006fa3f0 `mov eax, 4`
-			ANCHOR_JOINT,
-			WELD_JOINT,        // WeldJoint slot 5 005cb9d0 `mov eax, 6`
-			SNAP_JOINT,        // SnapJoint slot 5 0077d800 `mov eax, 7`
-			MOTOR_JOINT,       // MotorJoint slot 5 0063e420 `mov eax, 8`
-			FREE_JOINT
-		};
-
-	private:
-		IJointOwner* jointOwner;              // +0x20
-	protected:
-		bool active;                          // +0x24
-		G3D::CoordinateFrame jointCoord0;     // +0x28
-		G3D::CoordinateFrame jointCoord1;     // +0x58
-
-	protected:
-		virtual Edge::EdgeType getEdgeType() const         // slot 3
-		{
-			return JOINT;
-		}
-
-	protected:
-		Joint(Primitive* prim0, Primitive* prim1, const G3D::CoordinateFrame& _jointCoord0,
-		      const G3D::CoordinateFrame& _jointCoord1);   // 006455c0
-		Joint();                                           // 006456a0
-	public:
-		virtual ~Joint();                                  // 00645490 (slot 0 ??_G 00645680)
-
-	public:
-		virtual void setPrimitive(int i, Primitive* p);    // slot 4 (006456e0)
-		virtual JointType getJointType() const             // slot 5
-		{
-			return NO_JOINT;
-		}
-		virtual bool isBreakable() const                   // slot 6
-		{
-			return false;
-		}
-		virtual bool isBroken() const                      // slot 7
-		{
-			return false;
-		}
-		virtual bool joinsFace(Primitive* p, NormalId face) const   // slot 8
-		{
-			return false;
-		}
-		virtual bool isAligned()                           // slot 9
-		{
-			return true;
-		}
-		virtual G3D::CoordinateFrame align(Primitive* pMove, Primitive* pStay)   // slot 10 (005e28c0)
-		{
-			return G3D::CoordinateFrame();
-		}
-		virtual bool canStepWorld() const                  // slot 11 (analog name)
-		{
-			return false;
-		}
-		virtual bool canStepUi() const                     // slot 12
-		{
-			return false;
-		}
-		virtual void stepWorld()                           // slot 13 (analog name)
-		{
-		}
-		virtual void stepUi(int uiStepId)                  // slot 14
-		{
-		}
-
-		bool getActive() const
-		{
-			return active;
-		}
-		void setActive(bool value)
-		{
-			active = value;
-		}
-		void setJointCoord(int i, const G3D::CoordinateFrame& c);   // 00645750
-		const G3D::CoordinateFrame& getJointCoord(int i) const
-		{
-			return i == 0 ? jointCoord0 : jointCoord1;
-		}
-
-	private:
-		static bool canBuildJoint(Primitive* p0, Primitive* p1, NormalId nId0, NormalId nId1, float angleMax,
-		                          float planarMax);                                     // 006454b0
-	protected:
-		static bool canBuildJointLoose(Primitive* p0, Primitive* p1, NormalId nId0, NormalId nId1);   // 00645590
-		static bool canBuildJointTight(Primitive* p0, Primitive* p1, NormalId nId0, NormalId nId1);   // 00645560
-	};
-
-	// Copied from native-headers/v8world/Contact2008.h.
-	class __declspec(novtable) Contact : public Edge
-	{
-		friend struct ::NativeWorldShapesLayout;
-
-	private:
-		int lastContactStep;   // +0x20
-		int steppingIndex;     // +0x24
-		float jointK;          // +0x28
-		float elasticJointK;   // +0x2c
-		float kFriction;       // +0x30
-
-	private:
-		virtual void putInKernel(Kernel* _kernel)       // slot 1 (0060cb10)
-		{
-			IPipelined::putInKernel(_kernel);
-			onPrimitiveContactParametersChanged();
-		}
-		virtual void removeFromKernel()                 // slot 2 (0060cb30)
-		{
-			deleteAllConnectors();
-			IPipelined::removeFromKernel();
-		}
-		virtual Edge::EdgeType getEdgeType() const      // slot 3 (007286a0, folded)
-		{
-			return CONTACT;
-		}
-
-	protected:
-		void deleteConnector(ContactConnector*& c);     // 00606d10
-		virtual void deleteAllConnectors() = 0;         // slot 5
-		virtual bool stepContact() = 0;                 // slot 6
-
-	public:
-		Contact(Primitive* prim0, Primitive* prim1);    // 00606c20
-
-		virtual bool computeIsColliding(float overlapIgnored) = 0;   // slot 7
-		virtual int numConnectors() const = 0;                       // slot 8 (analog name)
-		virtual ContactConnector* getConnector(int i) = 0;           // slot 9 (analog name)
-
-		void onPrimitiveContactParametersChanged();     // 00607ad0
 	};
 
 	// 005e7ba0: the index of prev in this primitive's list (+0x14 when this is prim0 +0xc, else +0x18) plus one, checked
@@ -448,6 +260,24 @@ namespace RBX
 		if (anchored != _anchored)
 		{
 			anchored = _anchored;
+			bool newAnchored = dragging || anchored || jointAnchored;
+			if (newAnchored != oldAnchored && world)
+			{
+				if (newAnchored)
+					world->onPrimitiveAddedAnchor(this);
+				else
+					world->onPrimitiveRemovingAnchor(this);
+			}
+		}
+	}
+
+	// 005e8140: as setDragging, on jointAnchored (+0xaa); analog name.
+	void Primitive::setJointAnchored(bool _jointAnchored)
+	{
+		bool oldAnchored = dragging || anchored || jointAnchored;
+		if (jointAnchored != _jointAnchored)
+		{
+			jointAnchored = _jointAnchored;
 			bool newAnchored = dragging || anchored || jointAnchored;
 			if (newAnchored != oldAnchored && world)
 			{

@@ -9,7 +9,6 @@
 // WorldJointMulti | 2008-06 | draft (no current byte proof)
 // 0/9 mapped addresses byte-exact | 9 unproved | no mapped strings | by auto (+1) (mixed 2)
 // <<< native-status | src 7501bcc1 | roc native-status --write
-#define NATIVE_IPIPELINED2008_DONOR   // Joints2008.h reaches the donor IPipelined through v8world/Edge.h
 #include "v8world/Joints2008.h"
 #include "v8world/Primitive2008.h"
 #include "v8kernel/Kernel.h"

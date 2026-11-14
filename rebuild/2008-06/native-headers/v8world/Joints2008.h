@@ -10,8 +10,10 @@
 // original path would shadow the donor for nearly all recorders (see the proposal in
 // tests/record_native_world_joints.py). A unit must not include both this header and a donor joint header (or
 // v8world/Primitive.h / World.h, which include them).
-// The bases Edge / IPipelined come from the donor v8world/Edge.h (Edge ends at +0x20: Joint::setPrimitive 006456e0
-// reads prim0 / prim1 at +0xc / +0x10 and calls Edge::setPrimitive 00659290).
+// The bases Edge / IPipelined come from the native 2008 Edge, native-headers/AppUnit658/Edge.h (index0 / index1 at
+// +0x14 / +0x18, Edge ends at +0x20: Joint::setPrimitive 006456e0 reads prim0 / prim1 at +0xc / +0x10 and calls
+// Edge::setPrimitive 00659290), over v8kernel/IPipelined2008.h; a unit that also reaches the donor IPipelined defines
+// NATIVE_IPIPELINED2008_DONOR before including this header (same 2008 layout).
 // Every Joint field, slot and size below is read from the 2008-06 binary:
 //   RTTI     Joint 0084ad44 -> Edge -> IPipelined; RigidJoint 0083e07c, WeldJoint 0083e0bc, SnapJoint 0083e0fc
 //            -> RigidJoint -> Joint; MultiJoint 0084ae14 -> Joint; RotateJoint 0084adc4, GlueJoint 0084ae7c ->
@@ -37,7 +39,7 @@
 //   dtor     ~Joint 00645490 only restores the vtable (no assertion in 2008).
 #include <G3D/CoordinateFrame.h>
 #include <G3D/Vector2.h>
-#include "v8world/Edge.h"
+#include "AppUnit658/Edge.h"
 #include "v8kernel/Link.h"
 #include "util/NormalId.h"
 #include "util/SurfaceType.h"

@@ -18,8 +18,7 @@
 // computePlaneContact 00608580 needs Body pv +0x94 without updatePV (the donor Body reached through Connector2008.h
 // has none), the Block face-vertex table 0084aec8 and intersectRectQuad 00608160.
 // Primitive2008.h and BlockBlockContact2008.h are therefore not included here. The bases come from Contact2008.h
-// (donor Edge -> IPipelined), so IPipelined2008.h takes its donor switch, as in ContactUnit2008Contact.cpp.
-#define NATIVE_IPIPELINED2008_DONOR
+// (native 2008 Edge, AppUnit658/Edge.h -> IPipelined2008.h).
 #include "v8world/Contact2008.h"
 #include <G3D/Array.h>
 #include <G3D/CoordinateFrame.h>
