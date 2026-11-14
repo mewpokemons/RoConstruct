@@ -6,70 +6,15 @@
 // append 0059a190 (G3D 6.09 Array.h templates, instantiated here as COMDATs).
 //
 // EdgeList (owner +0x0, edges +0x4, otherPrimitives +0x10) is native-headers/v8world/Primitive2008.h.
-// Unit-local redeclaration (pattern of PrimitiveState.cpp / BlockBlockContactStep.cpp): RBX::Edge is copied from
-// native-headers/AppUnit658/Edge.h (same base, fields, offsets and slots) plus inline accessors that the bodies
-// need and that header lacks (its fields are private, with no accessors). The binary inlines them: both bodies
-// pick +0x14 / +0x18 with `cmp owner, [e+0xc]` (prim0), and insertEdge picks the other primitive the same way.
-// Their names are analog names after the donor Edge.h getNext / setNext / otherPrimitive (proposal in the batch result).
+// RBX::Edge is native-headers/AppUnit658/Edge.h, whose inline accessors (setIndex / getIndex / otherPrimitive) the
+// binary inlines: both bodies pick +0x14 / +0x18 with `cmp owner, [e+0xc]` (prim0), and insertEdge picks the other
+// primitive the same way.
 #include <G3D/Array.h>
 #include "v8world/Primitive2008.h"
+#include "AppUnit658/Edge.h"
 
 namespace RBX
 {
-	namespace Sim
-	{
-		enum EdgeState
-		{
-			UNDEFINED,
-			STEPPING,
-			SLEEPING,
-			TOUCHING,
-			TOUCHING_SLEEPING
-		};
-	}
-
-	class __declspec(novtable) Edge : public IPipelined
-	{
-	public:
-		enum EdgeType
-		{
-			JOINT,
-			CONTACT
-		};
-
-	private:
-		Sim::EdgeState edgeState;                      // +0x8
-		Primitive* prim0;                              // +0xc
-		Primitive* prim1;                              // +0x10
-		int index0;                                    // +0x14 (index in prim0's EdgeList, -1 = none)
-		int index1;                                    // +0x18 (index in prim1's EdgeList, -1 = none)
-		bool inEdgeList;                               // +0x1c
-
-	public:
-		Edge(Primitive* prim0, Primitive* prim1);      // 00659260
-		virtual ~Edge() {}                             // slot 0
-
-		virtual EdgeType getEdgeType() const = 0;      // slot 3
-		virtual void setPrimitive(int i, Primitive* p);   // slot 4 (00659290)
-
-		// Not in AppUnit658/Edge.h (proposal); inlined in 005e8610 / 005e8990.
-		Primitive* otherPrimitive(const Primitive* p) const
-		{
-			return p == prim0 ? prim1 : prim0;
-		}
-		int getIndex(const Primitive* p) const
-		{
-			return p == prim0 ? index0 : index1;
-		}
-		void setIndex(const Primitive* p, int index)
-		{
-			if (p == prim0)
-				index0 = index;
-			else
-				index1 = index;
-		}
-	};
-
 	// 005e8990
 	void EdgeList::insertEdge(Edge* e)
 	{

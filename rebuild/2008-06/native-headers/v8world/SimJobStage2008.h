@@ -18,6 +18,17 @@
 //   dtor     ??_G 0064d380: vtable store, list _Tidy 00682b40 and the aux delete at +0x10, then the donor ~IStage body.
 //   fields   simJobs +0x10: std::list<SimJob*> (0x1c bytes under these flags); the insert 0064d0f0 links the job and
 //            stores the list iterator in the job (+0x1c, SimJob2008.h).
+//   jobs     0064d0f0 (129 B, thiscall, ret 4): if job->slot 2 (getAssembly) is non-null, stores the job at that
+//            assembly's +0x40; then inserts the job before simJobs.end() (inline _Buynode 0064d0b0, _Incsize 005f26c0)
+//            and stores the returned iterator (container +0x1c, node +0x20) in the job. 0064d180 (95 B, ret 4): when
+//            simJobs.size() (+0x28) > 1 takes a neighbour job through 004cb480 (folded COMDAT: steps job's
+//            iterator, wrapping at end()), else NULL; hands the job's mechanisms to it (cdecl 005e53a0(job, other),
+//            SimJob unit); erases job->stageIterator (005888f0, folded list erase); clears the assembly's +0x40 through
+//            slot 2. 0064d200 (Assembly in, news AssemblySimJob 0x28) calls 0064d0f0 directly; 0064d2a0 calls 0064d180
+//            directly. 0064d1e0 (`jmp 0064d0f0`) and 0064d1f0 (`jmp 0064d180`) are the 5-byte tail-call entries other
+//            units call (HumanoidStates3.cpp MovingNoPhysicsBase::release 0066ed50 calls 0064d1f0). Names are analog
+//            names (no registry name: all four are placeholders); which pair is public is inferred from the callers.
+//            Bodies not built: they need the 2008 Assembly (+0x40 SimJob back-link), which no native header declares.
 #include <list>
 #include "v8world/IWorldStage.h"
 
@@ -44,5 +55,12 @@ namespace RBX
 		virtual StageType getStageType();                 // slot 1 (005cb9d0; NATIVE_KERNEL_STAGES_PENDING)
 		virtual void onEdgeAdded(Edge* e);                // slot 4 (0064d060)
 		virtual void onEdgeRemoving(Edge* e);             // slot 5 (0064d090)
+
+		void addSimJob(SimJob* job);                      // 0064d1e0 (`jmp 0064d0f0`; analog name)
+		void removeSimJob(SimJob* job);                   // 0064d1f0 (`jmp 0064d180`; analog name)
+
+	private:
+		void insertSimJob(SimJob* job);                   // 0064d0f0 (analog name)
+		void eraseSimJob(SimJob* job);                    // 0064d180 (analog name)
 	};
 }

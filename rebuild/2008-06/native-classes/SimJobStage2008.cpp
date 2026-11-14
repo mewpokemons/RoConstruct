@@ -35,4 +35,18 @@ namespace RBX
 		e->removeFromKernel();
 		e->removeFromStage(this);
 	}
+
+	// Parked (not credited): the prover finds no candidate for these 5-byte tail-jmp bodies (registry names for
+	// 0064d1e0 / 0064d1f0 are placeholders and a lone `jmp rel32` has no unique byte match).
+	// 0064d1e0 (`jmp 0064d0f0`: tail call to the insert, whose body needs the 2008 Assembly; see SimJobStage2008.h)
+	void SimJobStage::addSimJob(SimJob* job)
+	{
+		insertSimJob(job);
+	}
+
+	// 0064d1f0 (`jmp 0064d180`: tail call to the erase, whose body needs the 2008 Assembly; see SimJobStage2008.h)
+	void SimJobStage::removeSimJob(SimJob* job)
+	{
+		eraseSimJob(job);
+	}
 }

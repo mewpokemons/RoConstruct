@@ -62,5 +62,29 @@ namespace RBX
 
 		virtual EdgeType getEdgeType() const = 0;      // slot 3
 		virtual void setPrimitive(int i, Primitive* p);   // slot 4 (00659290)
+
+		// Inline accessors (no out-of-line copy in the binary; analog names after the donor Edge.h getNext / setNext /
+		// otherPrimitive). Each picks prim0's or prim1's slot with `cmp p, [e+0xc]`: getIndex reads +0x14 / +0x18 in
+		// Primitive::getNextJoint 005e7ba0 / getNextContact 005e7be0 and EdgeList::removeEdge 005e8610; setIndex writes
+		// them in removeEdge 005e8610 and insertEdge 005e8990; otherPrimitive reads +0x10 / +0xc in insertEdge 005e8990.
+		Primitive* getPrimitive(int i) const           // donor Edge.h inline; the Joints2008.h / Contact2008.h includers
+		{                                              // call it (exact bodies built against the donor copy)
+			return *(&this->prim0 + i);
+		}
+		Primitive* otherPrimitive(const Primitive* p) const
+		{
+			return p == prim0 ? prim1 : prim0;
+		}
+		int getIndex(const Primitive* p) const
+		{
+			return p == prim0 ? index0 : index1;
+		}
+		void setIndex(const Primitive* p, int index)
+		{
+			if (p == prim0)
+				index0 = index;
+			else
+				index1 = index;
+		}
 	};
 }
