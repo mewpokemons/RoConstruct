@@ -36,9 +36,7 @@ namespace RBX
 	// 00656db0 (?isVisible@ArrowPanel@RBX@@UBE_NXZ, slot 21 of 0084c164; vtable pointer 0084c1b8): dataModel (+0x15c)
 	// -> workspace (+0x204) -> RootInstance::ControllersUsed (+0x2a8 of the Workspace) through the out-of-line
 	// ComputeProp<ControllerTypeArray, RootInstance>::getValue 00656c30 (this unit), then values[controller (+0x160)].
-	// Not exact while native-headers/v8datamodel/RootInstance.h declares getControllersUsed() out of line: the
-	// original has no out-of-line RootInstance::getControllersUsed (none in the identity registry), it inlines
-	// `return ControllersUsed;` (header proposal).
+	// RootInstance.h inlines getControllersUsed() (no out-of-line RootInstance::getControllersUsed in the registry).
 	bool ArrowPanel::isVisible() const
 	{
 		return dataModel->getWorkspace()->getControllersUsed().hasController(controller);

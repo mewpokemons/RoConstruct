@@ -43,6 +43,8 @@ namespace RBX
 
 		typedef void (*DELAY_FUNC)(unsigned uiMS);
 
+		// 00501400 (reconciled with AppUnit500Profiler.cpp, which builds it with external linkage): the target
+		// multiplies t1Hi through _allmul (006a16d0) by 0x100000000 and shift-subtracts t0Hi.
 		static G3D::int64 GetCyclesDifference(DELAY_FUNC DelayFunction, unsigned uiParameter)
 		{
 			unsigned t0Hi, t0Lo;
@@ -74,7 +76,7 @@ namespace RBX
 				return 0;
 			}
 
-			return (((G3D::int64)t1Hi << 32) + t1Lo) - (((G3D::int64)t0Hi << 32) + t0Lo);
+			return ((G3D::int64)t1Hi * 0x100000000 + t1Lo) - (((G3D::int64)t0Hi << 32) + t0Lo);
 		}
 
 		static void Delay(unsigned time)
