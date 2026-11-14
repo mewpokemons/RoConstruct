@@ -11,6 +11,7 @@
 #include "humanoid/Humanoid.h"
 #include "v8world/Primitive.h"
 #include "v8world/Assembly.h"
+#include "v8world/AssemblyLayout.h" // 2008 Assembly +0x24 root clump / Clump +0x1c root primitive (donor offsets differ)
 #include <G3D/System.h>
 
 namespace RBX
@@ -77,7 +78,7 @@ namespace RBX
 		G3D::CoordinateFrame torsoCoord = seatWeld * C1.inverse();
 
 		Primitive* torsoPrim = humanoid->getTorsoPrimitive();
-		Primitive* root = torsoPrim->getAssembly()->getRootClump()->getRootPrimitive();
+		Primitive* root = AssemblyLayout::getRootPrimitive(torsoPrim->getAssembly()); // getRootClump()->getRootPrimitive()
 		if (root == torsoPrim)
 		{
 			torsoPrim->setCoordinateFrame(torsoCoord);
@@ -85,7 +86,9 @@ namespace RBX
 		}
 		else
 		{
-			root->setCoordinateFrame(torsoCoord * torsoPrim->getCoordinateFrame().toObjectSpace(root->getCoordinateFrame()));
+			G3D::CoordinateFrame rootOffset = torsoPrim->getCoordinateFrame().toObjectSpace(root->getCoordinateFrame());
+			G3D::CoordinateFrame rootCoord = torsoCoord * rootOffset;
+			root->setCoordinateFrame(rootCoord);
 			root->setVelocity(Velocity::zero());
 		}
 
