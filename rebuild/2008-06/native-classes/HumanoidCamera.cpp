@@ -11,6 +11,7 @@
 #include "humanoid/Humanoid2008.h"
 #include "v8datamodel/ModelInstance.h"
 #include "v8datamodel/Tool.h"
+#include "v8world/Joint.h"
 #include "v8kernel/Body.h"
 #include "util/Math.h"
 #include <boost/bind.hpp>
@@ -37,33 +38,108 @@ namespace RBX
 		return NULL;
 	}
 
-	// NOT BUILT (header proposals, see the batch result), both in this part-embedded Humanoid unit:
-	// - onEvent 005dc740 (Listener<RunService, Stepped>, this adjusted by -0x1a4, `ret 0xc`): if (world +0x21c) {
-	//   if (ModelInstance* m = dynamic_cast<ModelInstance*>(getParent())) 00645450(&currentState +0x220, event.step,
-	//   m->getTopPVController() 0059a9e0) (an undeclared cdecl HUMAN::HumanoidState stepper); if (getTorsoPrimitive())
-	//   (inlined: getTorso 005d8b10, +0x228) getTorsoPrimitive()->setCanCollide(false) (Primitive 005e75b0);
-	//   checkForJointDeath() 005dc6c0 (undeclared in Humanoid2008.h); if (walkTimer > 0 && --walkTimer == 0)
-	//   walkMode = DIRECTION_MOVE }. Needs getTorsoPrimitive, checkForJointDeath and the 00645450 stepper declared.
-	// - render3dAdorn 005d9c30 (IRenderable, this adjusted by -0x13c): walkMode == CLICK_TO_MOVE and this ==
-	//   modelIsCharacter(Players::findLocalCharacter(this)) (inlined: dynamic_cast<ModelInstance*> +
-	//   findModifierOfType<Humanoid> 005d8690) and Workspace::findWorkspace 005a3380: Vector3 p(0,0,0);
-	//   if (hasWalkToPoint(p) 005d79b0 && getHead() 005d8a10 && head float +0x328 != 0) renderWaypoint 005d7750; then
-	//   getCharacterFromHumanoid 005d7670 -> for_eachChild(0045c600 helper: PartInstance 0059dd50(1.0f), recursing
-	//   into ModelInstances); finally currentState (+0x220) -> 00645060(adorn) (undeclared HumanoidState method).
-	//   Needs the PartInstance +0x328 accessor, the 0045c600 helper and HumanoidState 00645060 declared.
-#ifdef NATIVE_HUMANOID_PENDING_GETTERS
 	// 005d90a0 ?getTorsoPrimitive@Humanoid@RBX@@QBEPAVPrimitive@2@XZ (18 bytes): getTorso 005d8b10, then the embedded
-	// Primitive (part + 0x228) or NULL. Siblings 005d90c0 (left leg), 005d90e0 (right leg), 005d9100 (head) have the
-	// same shape. onEvent 005dc740 inlines this body (getTorso, `add eax, 0x228`), so it is defined in the Humanoid unit.
-	// Pending header proposal: humanoid/Humanoid2008.h does not declare getTorsoPrimitive (or the three siblings). A
-	// trial (2026-11-14) compiled this body against the donor humanoid/Humanoid.h declaration with the part-embedded
-	// PartInstance (HumanoidStateFloor.cpp flags): byte-identical to 005d90a0 (18/18, relocations masked).
+	// Primitive (part + 0x228) or NULL. onEvent 005dc740 inlines this body (getTorso, `add eax, 0x228`), so it is
+	// defined in the Humanoid unit. Earlier trial (2026-11-14, donor humanoid/Humanoid.h declaration, same flags):
+	// byte-identical (18/18, relocations masked).
 	Primitive* Humanoid::getTorsoPrimitive() const
 	{
 		PartInstance* part = getTorso();
 		return part ? part->getPrimitive() : NULL;
 	}
-#endif
+
+	// 005d90c0: same shape as getTorsoPrimitive over getLeftLeg 005d8c10.
+	Primitive* Humanoid::getLeftLegPrimitive() const
+	{
+		PartInstance* part = getLeftLeg();
+		return part ? part->getPrimitive() : NULL;
+	}
+
+	// 005d90e0: same shape over getRightLeg 005d8d10.
+	Primitive* Humanoid::getRightLegPrimitive() const
+	{
+		PartInstance* part = getRightLeg();
+		return part ? part->getPrimitive() : NULL;
+	}
+
+	// 005d9100: same shape over getHead 005d8a10 (inlined in checkForJointDeath 005dc6c0).
+	Primitive* Humanoid::getHeadPrimitive() const
+	{
+		PartInstance* part = getHead();
+		return part ? part->getPrimitive() : NULL;
+	}
+
+	// 005d9120: same shape over getLeftArm 005d8e10.
+	Primitive* Humanoid::getLeftArmPrimitive() const
+	{
+		PartInstance* part = getLeftArm();
+		return part ? part->getPrimitive() : NULL;
+	}
+
+	// 005d9140: same shape over getRightArm 005d8f10.
+	Primitive* Humanoid::getRightArmPrimitive() const
+	{
+		PartInstance* part = getRightArm();
+		return part ? part->getPrimitive() : NULL;
+	}
+
+	// 005d9160 (19 bytes): getTorso 005d8b10, then `mov eax, [eax + 0x2c8]` (the embedded Primitive's body +0xa0) or
+	// NULL. Reads no Body field, so the donor Body this part-embedded unit sees does not affect it.
+	Body* Humanoid::getTorsoBody()
+	{
+		PartInstance* part = getTorso();
+		return part ? part->getPrimitive()->getBody() : NULL;
+	}
+
+	// 005dc6c0 (119 bytes; called by onEvent 005dc740). Head and torso primitives inline (getHead 005d8a10 /
+	// getTorso 005d8b10, + 0x228); Primitive::getFirstJoint 005e7b90 / getNextJoint 005e7ba0; Edge::otherPrimitive
+	// inline (prim0 +0xc / prim1 +0x10); hadHeadJoint is bit 2 of +0x1e8; setHealth 005dbe70(0.0f).
+	void Humanoid::checkForJointDeath()
+	{
+		if (Primitive* headPrimitive = getHeadPrimitive())
+		{
+			if (Primitive* torsoPrimitive = getTorsoPrimitive())
+			{
+				for (Joint* current = headPrimitive->getFirstJoint(); current != NULL; current = headPrimitive->getNextJoint(current))
+				{
+					if (current->otherPrimitive(headPrimitive) == torsoPrimitive)
+					{
+						hadHeadJoint = true;
+						return;
+					}
+				}
+			}
+		}
+
+		if (hadHeadJoint)
+		{
+			setHealth(0.0f);
+		}
+	}
+
+	// 005dc740 (Listener<RunService, Stepped>, this adjusted by -0x1a4, `ret 0xc`): world +0x21c tested first;
+	// dynamic_cast<ModelInstance*>(getParent()) -> PVInstance::getTopPVController 0059a9e0 -> HumanoidState stepper
+	// 00645450(&currentState +0x220, event.step, controller); getTorsoPrimitive inlined twice; Primitive::setCanCollide
+	// 005e75b0(false); checkForJointDeath 005dc6c0; walkTimer +0x1b4 / walkMode +0x1b8.
+	void Humanoid::onEvent(const RunService* source, Stepped event)
+	{
+		if (world)
+		{
+			if (ModelInstance* character = dynamic_cast<ModelInstance*>(getParent()))
+				HUMAN::HumanoidState::stepState(currentState, event.step, character->getTopPVController());
+
+			if (getTorsoPrimitive())
+				getTorsoPrimitive()->setCanCollide(false);
+
+			checkForJointDeath();
+
+			if (walkTimer > 0)
+			{
+				if (--walkTimer == 0)
+					walkMode = DIRECTION_MOVE;
+			}
+		}
+	}
 
 	// 005d9d10: boost::bind target of tellCameraNear / getIgnorePrims (visitDescendents 005d8540); pushes part+0x228.
 	void collectAllDescendantCharacterPrims(boost::shared_ptr<Instance> descendent, std::vector<Primitive*>& primitives)

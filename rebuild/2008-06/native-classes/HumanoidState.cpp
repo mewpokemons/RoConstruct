@@ -38,6 +38,13 @@ Humanoid* HumanoidState::getHumanoid() const
     return humanoid;
 }
 
+// 00643d30 (16 bytes): floorPart +0x24, then its embedded Primitive (part + 0x228) or NULL.
+Primitive* HumanoidState::getFloorPrimitive() const
+{
+    PartInstance* part = floorPart.get();
+    return part ? part->getPrimitive() : NULL;
+}
+
 // 00643330
 bool HumanoidState::speedSettled() const
 {

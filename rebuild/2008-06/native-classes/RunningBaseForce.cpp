@@ -22,25 +22,55 @@
 //   The Body getters are called out of line here (COMDAT copies in the BodyMover range 0062e100..0062e2e0), as the
 //   trial compile below also does.
 //
-// BLOCKED on header proposals (this unit does not compile until they exist; reported in the batch result):
-//   1. native-headers/v8kernel/Body2008.h (body/primitive owner): public inline Body members getBranchIBodyV3,
-//      getBranchForce, getBranchTorque, accumulateForceAtBranchCofm, an inline branch-velocity accessor, and
-//      SimBody::accumulateForceCofm (donor tools/rbxgs v8kernel/Body.h / SimBody.h shapes; offsets above).
-//   2. native-headers/humanoid/HumanoidState.h: `Primitive* getFloorPrimitive() const;  // 00643d30` (analog name).
-//   3. native-headers/humanoid/Humanoid2008.h: `Body* getTorsoBody(); // 005d9160` and `Body* getRootBody(); // 005d9180`
-//      (tests/NativeHumanoidStateCalls.h declares both), and a Connector2008.h that reaches Body2008.h instead of the
-//      donor v8kernel/Body.h (the donor Body cannot share a unit with Body2008.h, C2011).
-// Trial (scratch copies of Body2008.h / HumanoidState.h with proposals 1-2 and a declaration stub for proposal 3, not
-// registered): compiles; 1066 bytes against 1061, residual differences only in x87 scheduling of the move block
-// (target keeps desired x / z as separate spills and evaluates the clamp limits before pushing) and the floor-body load
-// order; all calls, constants and field offsets agree.
+// The batch-11 header proposals are landed (batch 12): Body2008.h has the inline branch members (getBranchIBodyV3,
+// getBranchForce, getBranchTorque, getBranchVelocity, accumulateForceAtBranchCofm / SimBody::accumulateForceCofm),
+// HumanoidState.h declares getFloorPrimitive 00643d30, Humanoid2008.h declares getTorsoBody / getRootBody, and this
+// unit reaches Humanoid2008.h through NATIVE_HUMANOID_UNIT_CONNECTOR with the unit-local Connector below.
+// PARKED near miss: 1066 bytes against 1061. Residual differences are x87 scheduling only: the negated floor force
+// (0066679b..006667b6) is stored after the floor-body loads in the target, and the move block keeps desired x / z as
+// separate spills and evaluates z after the y select. Rejected variant (batch 12): building desiredAccel with the
+// three-argument Vector3 constructor (x, y-select, z) -> 1068 bytes, same divergences. All calls, constants and
+// field offsets agree.
 #include <G3D/Vector3.h>
 #include <G3D/g3dmath.h>
 #include <algorithm>
 #include "util/Velocity.h"
 #include "v8kernel/Body2008.h"
 #include "v8world/Primitive2008.h"
+#include "v8kernel/KernelIndex.h"
 #include "humanoid/HumanoidStates1.h"
+
+// Unit-local Connector, exactly as native-headers/v8kernel/Connector2008.h declares it (that header reaches the donor
+// v8kernel/Body.h, which cannot share this unit with Body2008.h: C2011). Same pattern as BodyGyro.cpp; selected in
+// Humanoid2008.h by NATIVE_HUMANOID_UNIT_CONNECTOR. No Connector or Humanoid vtable is emitted here.
+namespace RBX
+{
+	class Body;
+
+	class Connector : public KernelIndex
+	{
+	public:
+		Connector() {}
+		__declspec(noinline) int& getKernelIndex() { return kernelIndex; }
+		virtual ~Connector() {}                                         // slot 0 (??_G 006062c0)
+		virtual void computeForce(const float dt, bool throttling) = 0; // slot 1
+		virtual bool canThrottle() const                                // slot 2 (00565950)
+		{
+			return true;
+		}
+		virtual bool getBroken()                                        // slot 3 (0060a2f0)
+		{
+			return false;
+		}
+		virtual Body* getBody(int i) = 0;                               // slot 4 (analog name)
+		virtual float potentialEnergy()                                 // slot 5 (005e72c0)
+		{
+			return 0;
+		}
+	};
+}
+
+#define NATIVE_HUMANOID_UNIT_CONNECTOR
 #include "humanoid/Humanoid2008.h"
 #include "AppUnit664/HumanoidForceLimits.h"
 

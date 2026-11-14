@@ -132,9 +132,8 @@ namespace RBX
 		return G3D::CoordinateFrame(G3D::Vector3(0.0f, 0.5f, 0.0f));
 	}
 
-#ifdef NATIVE_HUMANOID_PENDING_GETTERS
 	// 005d7a30 ?getRightArmGrip@Humanoid@RBX@@QBE?AVCoordinateFrame@G3D@@XZ (90 bytes; caller Tool weld "RightGrip").
-	// Pending header proposal: humanoid/Humanoid2008.h does not declare getRightArmGrip. Donor tools/rbxgs
+	// Declared in humanoid/Humanoid2008.h. Donor tools/rbxgs
 	// Humanoid.cpp body: CoordinateFrame() 004782d0, lookAt 00518b90 with target (0,-1,0) and up (0,0,-1) (-1.0f
 	// 0081c3b8), translation (0,-1,0) stored at +0x24..+0x2c. A trial (2026-11-14) compiled this body against the
 	// donor humanoid/Humanoid.h declaration (HumanoidStateFloor.cpp flags) and it was byte-identical to 005d7a30
@@ -147,7 +146,6 @@ namespace RBX
 
 		return cframe;
 	}
-#endif
 
 	void Humanoid::renderWaypoint(Adorn* adorn, const G3D::Vector3& waypoint)
 	{

@@ -9,13 +9,10 @@
 // the two Body declarations cannot share a unit (C2011). Following native-classes/ContactUnit2008ConnectorBody.cpp,
 // Connector, BodyMover and BodyGyro are redeclared here, unit-locally, exactly as Connector2008.h and BodyMovers.h
 // declare them (same bases, virtual slots, fields and offsets cited there). No constructor or vtable is emitted.
-// BLOCKED on a header proposal (native-headers/v8kernel/Body2008.h, body/primitive owner): this unit needs the two
-// public inline Body members both functions inline (0062e95d..0062e998 and the cofm/toDiagonal blocks):
-//     G3D::Vector3 getBranchIBodyV3() const { return Math::toDiagonal(getBranchIBody()); }  // 005ddbb0
-//     const G3D::Vector3& getBranchTorque() const   // root +0x10 -> simBody +0x2c -> torque +0x90, else Vector3::zero()
-//     { if (root->simBody) return root->simBody->torque; else return G3D::Vector3::zero(); }
-// (donor tools/rbxgs v8kernel/Body.h declares both). Until they exist this unit does not compile. With them added
-// (trial with a private copy of Body2008.h, not registered), computeOrientation 0062e910 is byte-exact (804 bytes).
+// Body::getBranchIBodyV3 (0062e100) and Body::getBranchTorque (0062e2e0) are now public inline members of
+// native-headers/v8kernel/Body2008.h (donor tools/rbxgs v8kernel/Body.h shapes). With them computeOrientation 0062e910
+// and the out-of-line COMDATs 0062e100 / 0062e2e0 / Body::accumulateTorque 006060b0 are prove.py inactive_exact
+// (batch 12); computeBalance 0062ec40 stays parked (x87 scheduling, see below).
 #include <G3D/Vector3.h>
 #include <G3D/CoordinateFrame.h>
 #include <G3D/g3dmath.h>
