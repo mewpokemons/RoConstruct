@@ -1,3 +1,4 @@
+// native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /D_AFXDLL /DNDEBUG /D_MBCS /I{headers}/../../../tools/rbxgs/Client/Network/raknet30/Source
 // 2008-06 native rows of the event and bound-function descriptor instances of the Network::Client unit
 // (Network/Client.cpp, 0049ed30..004a156f) inside the application range 004a0000..004a4000 (inactive). Verified by
 // tests/record_native_app_unit4a0.py. All headers are read-only here (Client: native-headers/Network/Client2008.h,

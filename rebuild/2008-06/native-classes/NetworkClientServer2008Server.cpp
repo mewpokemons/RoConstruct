@@ -1,3 +1,4 @@
+// native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /D_AFXDLL /DNDEBUG /D_MBCS /I{headers}/../../../tools/rbxgs/Client/Network/raknet30/Source
 // 2008-06 native RBX::Network::Server (inactive); evidence in native-headers/Network/Server2008.h.
 // Verified by tests/record_native_network_client_server2008.py. Original bodies: constructor 004a4b30,
 // DescribedCreatable<Server> 004a42c0, FactoryProduct<Server> 004a15f0 / ~FactoryProduct 004a1580, destructor
@@ -8,6 +9,7 @@
 // <<< native-status | src 308c979a | roc native-status --write
 #include "Network/Server2008.h"
 #include "Network/API.h"
+#include "script/Script.h"
 
 namespace RBX
 {
@@ -44,6 +46,18 @@ namespace RBX
 
 		Server::~Server()
 		{
+		}
+
+		// 004a31d0 (name provisional; see Server2008.h)
+		void Server::registerScript(boost::shared_ptr<Instance> instance)
+		{
+			if (Script* script = dynamic_cast<Script*>(instance.get()))
+			{
+				if (script->getScriptId().isNull())
+					names.insert(script->getEmbeddedCode());
+				else
+					names.insert(script->getScriptId().toString());
+			}
 		}
 	}
 }

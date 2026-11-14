@@ -1,3 +1,4 @@
+// native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /D_AFXDLL /DNDEBUG /D_MBCS /Irebuild/2008-06/native-headers/boost-noinline-shared-destructor /I{headers}/../../../tools/rbxgs/Client/Network/raknet30/Source
 // 2008-06 native ServiceProvider::find<Network::Server>() const instance of the Network::Server unit (Network/Server.cpp)
 // inside the application range 004a0000..004a4000 (inactive). Verified by tests/record_native_app_unit4a0.py. Every
 // header is a committed native header, read-only here.

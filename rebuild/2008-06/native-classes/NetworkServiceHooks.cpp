@@ -6,10 +6,13 @@
 //     (CloseConnection) and 10 (Shutdown), ServiceProvider::find<Players>() const 004125d0 / create<Players>() const
 //     00412710, Players::setConnection 00496510, Peer::onServiceProvider 004b5700. The find / create results are
 //     named locals: chained calls push the setConnection argument before the find / create call (rejected).
-// Open in this unit (declarations missing from the read-only headers): Server::onServiceProvider 004a4100 (needs
-// Peer::peerInterface 00609a30 and the Server member 004a31d0 bound into visitDescendents 004a27e0 /
-// event_descendentAdded.connect 004a3340), Server::OnReceive 004a4dc0 (needs Server's static signal at 00970ebc and
-// the Replicator member 004a2ac0), Client::OnReceive 004a1070 (Client signals), Peer::onServiceProvider 004b5700
+// Open in this unit (declarations missing from headers this unit does not own): Server::onServiceProvider 004a4100
+// (needs Peer::peerInterface 00609a30 in Network/Peer2008.h; Server::registerScript 004a31d0 and the
+// boost::bind into visitDescendents 004a27e0 / event_descendentAdded.connect 004a3340 are now available),
+// Server::OnReceive 004a4dc0 (Server::event_IncommingConnection 00970ebc is now declared; needs
+// Server::ClientProxy::sendTop 004a2ac0 in Network/ClientProxy2008.h), Client::OnReceive 004a1070 (signals
+// 00970c48 / 00970c7c now declared; event_ConnectionFailed 00970bb4 is void(std::string, int, std::string), which
+// the core reflection/signal.h cannot declare: no SignalDescImpl<3>), Peer::onServiceProvider 004b5700
 // (stats item members), RoundRobinPhysicsSender::sendPackets 004cd420 (0x13c-byte local type 004cbd40 / 004c9a70,
 // members 004ca040 / 004cac30 / 004cbad0), Replicator::wantReplicate 004aaf90 and StringReceiver::receive 004a6f70
 // (not declared). JointsService::askAddChild 004afb30 is already the inline body in v8datamodel/JointsService.h.

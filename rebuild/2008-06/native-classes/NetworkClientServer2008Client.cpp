@@ -1,3 +1,4 @@
+// native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /D_AFXDLL /DNDEBUG /D_MBCS /I{headers}/../../../tools/rbxgs/Client/Network/raknet30/Source
 // 2008-06 native RBX::Network::Client (inactive); evidence in native-headers/Network/Client2008.h.
 // Verified by tests/record_native_network_client_server2008.py. Original bodies: constructor 004a0990,
 // DescribedCreatable<Client> 0049ff10, FactoryProduct<Client> 0049eef0 / ~FactoryProduct 0049edb0, destructor
