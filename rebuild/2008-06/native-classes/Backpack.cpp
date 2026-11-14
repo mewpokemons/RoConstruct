@@ -5,6 +5,8 @@
 // no original address mapped to this file yet | by -
 // <<< native-status | src ad5f3cec | roc native-status --write
 #include "v8datamodel/Backpack.h"
+#include "v8datamodel/Workspace.h"
+#include "Network/Players.h"
 
 namespace RBX
 {
@@ -26,6 +28,27 @@ namespace RBX
 	Backpack::Backpack()
 	{
 		setName("Backpack");
+	}
+
+	// 005d18e0 (IScriptOwner vtable 0083b924 slot 0, this adjusted by -0x168). ServiceProvider::find<Workspace>
+	// 00491e50, Network::Players::findLocalPlayer 0049ac80, Network::Players::backendProcessing 00495eb0,
+	// dynamic_cast to LocalScript (RTTI 00948dd4) and HopperBin (RTTI 009496a0) of script->getParent(); returns the
+	// Workspace's IScriptOwner base (+0x340).
+	IScriptOwner* Backpack::scriptShouldRun(Script* script)
+	{
+		Workspace* workspace = ServiceProvider::find<Workspace>(this);
+		if (!workspace)
+			return NULL;
+
+		bool isLocalBackpack = getParent() == Network::Players::findLocalPlayer(this);
+		bool backend = Network::Players::backendProcessing(this, true);
+		bool isLocalScript = dynamic_cast<LocalScript*>(script) != NULL;
+		bool inHopperBin = dynamic_cast<HopperBin*>(script->getParent()) != NULL;
+
+		if (isLocalScript ? isLocalBackpack : ((inHopperBin && isLocalBackpack) || backend))
+			return workspace;
+
+		return NULL;
 	}
 }
 
