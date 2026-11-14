@@ -1,5 +1,5 @@
 // native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /fp:fast
-// 2008-06 native RBX::HUMAN::RunningBase::onComputeForce 00666550 (inactive; vtable 0084cc38 slot 8). Not in any build list.
+// 2008-06 native RBX::HUMAN::RunningBase::onComputeForce 00666550 (inactive; vtable 0084cc38 slot 8), plus Freefall 006675d0 / Jumping 00667a40 onComputeForce (below). Not in any build list.
 // Layout and the other RunningBase rows: native-headers/humanoid/HumanoidStates1.h, native-classes/HumanoidStates1.cpp.
 //
 // Evidence (2008-06 Roblox.exe, 00666550..00666975, `ret 4`):
@@ -39,6 +39,7 @@
 #include "v8world/Primitive2008.h"
 #include "v8kernel/KernelIndex.h"
 #include "humanoid/HumanoidStates1.h"
+#include "humanoid/HumanoidStates2.h"
 
 // Unit-local Connector, exactly as native-headers/v8kernel/Connector2008.h declares it (that header reaches the donor
 // v8kernel/Body.h, which cannot share this unit with Body2008.h: C2011). Same pattern as BodyGyro.cpp; selected in
@@ -135,6 +136,75 @@ void RunningBase::onComputeForce(float dt)
     rootBody->accumulateForceAtBranchCofm(force);
     if (floorPrimitive)
         floorPrimitive->getBody()->accumulateForce(-force, floorTouchInWorld);
+}
+
+// Freefall::onComputeForce 006675d0 and Jumping::onComputeForce 00667a40 (drafts moved here from HumanoidStates2.cpp,
+// whose constructors need the native PartInstance.h; that header reaches the donor v8kernel/Body.h, which cannot share
+// a unit with Body2008.h). Freefall inlines the Body branch getters (moment copy 00513220 + Math::toDiagonal 005ddbb0,
+// branch torque +0x90 / static zero 0096f044 under guard 0096f050, branch velocity +0x3c / static 0097d568, branch
+// mass), and calls accumulateTorque 006060b0 and accumulateForceAtBranchCofm 0062e140 out of line.
+// 00962aa8: writable .data float 120000.0f without a symbol; the yaw-torque limit gain.
+// PARKED near miss (batch 13, 514 bytes = target size): the only differences are the stack frame (sub esp 0x60 against
+// 0x54) and the second Math::toDiagonal result, which the target reads back from the shared stack temp ([esp + 0x24])
+// while this compile reads [eax + 4]. Rejected variants: (1) both toDiagonal calls inline in the expressions -> 513 bytes,
+// updatePV 00599360 is called before the first moment copy (target: moment first); (2) one named iBody local assigned
+// twice -> worse (three-float copy of the second result). Next hypothesis (not tried, three-trial limit): the inline
+// Body::getBranchIBodyV3() in both places (its out-of-line COMDAT 0062e100 is what RunningBase calls).
+extern float freefallYawLimitGain;                       // 00962aa8 (analog name)
+
+// 006675d0
+void Freefall::onComputeForce(float dt)
+{
+    Balancing::onComputeForce(dt);
+    Body* body = getHumanoid()->getRootBody();
+    if (!body)
+        return;
+    G3D::Vector3 iBody = Math::toDiagonal(body->getBranchIBody());
+    float torqueY = (desiredYRotationalVelocity - body->getVelocity().rotational.y) * iBody.y * 7500.0f;
+    torqueY -= body->getBranchTorque().y;
+    float maxTorqueY = Math::toDiagonal(body->getBranchIBody()).y * freefallYawLimitGain;
+    body->accumulateTorque(G3D::Vector3(0.0f, G3D::clamp(torqueY, -maxTorqueY, maxTorqueY), 0.0f));
+    G3D::Vector3 accel = (desiredVelocity - body->getBranchVelocity().linear) * 1250.0f;
+    G3D::Vector3 clamped = accel.clamp(minMoveForce(), maxMoveForce());
+    float mass = body->getBranchMass();
+    body->accumulateForceAtBranchCofm(G3D::Vector3(clamped.x * mass, 0.0f, clamped.z * mass));
+}
+
+// 00667a40: Flying::onComputeForce 0070bdf0 called directly; flag11 (+0x11) set when there is no root body or the
+// jump force (50.0f [0084ced4] - pv.velocity.linear.y +0xc8) * 5000.0f [0084ced0] is not positive. With a floor
+// primitive (00643d30 called twice): floor root = primitive body +0xa0 -> root +0x10; std::min of the two branch masses
+// (floor's evaluated first); the lift above getBranchForce 0062e2a0 .y goes to accumulateForceAtBranchCofm 0062e140 and
+// the negated lift to the floor root (inline accumulateForce, SimBody::accumulateForce 00612fb0) at floorTouchInWorld.
+// PARKED near miss (batch 13, 337 bytes = target size): one instruction is scheduled differently: the target loads the
+// floor root's simBody (`mov ecx, [edx + 0x2c]`) before storing the (0, -delta, 0) temporary, this compile after it
+// (the same x87/load scheduling residual as RunningBase above). Accepted steps: early returns setting flag11 (draft:
+// nested ifs -> 343 bytes, `test ah, 5; jp` and the flag11 block moved to the end), and holding getBranchForce().y as a
+// const float& (draft: Vector3 reference -> `fsub [ecx + 4]` without `add ecx, 4`).
+void Jumping::onComputeForce(float dt)
+{
+    Flying::onComputeForce(dt);
+    if (flag11)
+        return;
+    Body* body = getHumanoid()->getRootBody();
+    if (!body) {
+        flag11 = true;
+        return;
+    }
+    float jumpForce = (50.0f - body->getVelocity().linear.y) * 5000.0f;
+    if (jumpForce <= 0.0f) {
+        flag11 = true;
+        return;
+    }
+    if (getFloorPrimitive()) {
+        Body* floorRoot = getFloorPrimitive()->getBody()->getRoot();
+        float lift = std::min(body->getBranchMass(), floorRoot->getBranchMass()) * jumpForce;
+        const float& currentY = body->getBranchForce().y;
+        if (lift > currentY) {
+            float delta = lift - currentY;
+            body->accumulateForceAtBranchCofm(G3D::Vector3(0.0f, delta, 0.0f));
+            floorRoot->accumulateForce(G3D::Vector3(0.0f, -delta, 0.0f), floorTouchInWorld);
+        }
+    }
 }
 
 }

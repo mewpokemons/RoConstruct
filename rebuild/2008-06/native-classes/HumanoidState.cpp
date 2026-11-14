@@ -6,16 +6,19 @@
 // <<< native-status | src ff825017 | roc native-status --write
 // Flags and includes follow the sibling unit HumanoidStateFloor.cpp (same original HumanoidState.cpp, 00643xxx):
 // the limb flag setters need a complete part-embedded Primitive (Primitive::setCanSleep 005e75e0, +0xab).
+// Batch 13: switched from the native humanoid/Humanoid.h to humanoid/Humanoid2008.h, which declares setStrafe 005dc230
+// and the const limb-primitive getters 005d90a0..005d9140 (the decorated names HumanoidCamera.cpp defines). The
+// part-embedded PartInstance.h reaches the donor v8kernel/Connector.h, so this unit selects
+// NATIVE_HUMANOID2008_DONOR_CONNECTOR as HumanoidCamera.cpp / Humanoid2008Parts.cpp do (no Humanoid vtable built here).
+#define NATIVE_HUMANOID2008_DONOR_CONNECTOR
 #include "v8datamodel/PartInstance.h"
 #include "humanoid/HumanoidState.h"
-#include "humanoid/Humanoid.h"
+#include "humanoid/Humanoid2008.h"
 
 namespace RBX {
 namespace HUMAN {
 
-// 00643e00. Pending header: humanoid/Humanoid.h has no setStrafe (005dc230, bit 4 of +0x1e8; declared in
-// Humanoid2008.h, which lacks the limb primitive getters used below). Kept unchanged until Humanoid.h gains it.
-#ifdef NATIVE_HUMANOID_SETSTRAFE_PENDING
+// 00643e00: setJump 005dc270(false), setStrafe 005dc230(false) (bit 4 of +0x1e8), setLimbFlag(false).
 HumanoidState::HumanoidState(Humanoid* humanoid)
     : humanoid(humanoid), value0c(0.0f), flag10(false), flag11(false),
       speed38(0.0f), speed3c(0.0f)
@@ -24,7 +27,6 @@ HumanoidState::HumanoidState(Humanoid* humanoid)
     humanoid->setStrafe(false);
     setLimbFlag(false);
 }
-#endif
 
 // 006435c0
 HumanoidState::~HumanoidState()
