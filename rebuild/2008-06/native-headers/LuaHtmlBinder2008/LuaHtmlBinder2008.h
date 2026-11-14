@@ -17,7 +17,10 @@
 //        list3<arg<1>, reference_wrapper<const PropertyDescriptor>, value<Binder*>>> (the property-changed slot).
 #include "AppLeaves2008/Marshaller2008.h"     // first: MFC/ATL before anything that includes windows.h
 #include "AppLeaves2008/EventHandler2008.h"
+#include <afxext.h>                           // CFormView (afxhtml.h needs it first)
+#include <afxhtml.h>                          // CHtmlView, the base of CLuaHtmlView
 #include <atlbase.h>
+#include <atlcom.h>                           // CComObjectRootEx, the reference count of CLuaFunction
 #include <mshtml.h>
 #include <list>
 #include <string>
@@ -26,12 +29,66 @@
 #include <boost/noncopyable.hpp>
 #include <boost/signals/connection.hpp>
 #include "v8tree/Instance.h"
+#include "script/ThreadRef.h"                // RBX::Lua::FunctionRef (CLuaFunction +0x14, 0x24 bytes)
+#include "security/SecurityContext.h"       // RBX::Security::Identities (CLuaFunction +0x38)
 
-// CLuaHtmlView itself is not recovered natively; only the nesting its Binder needs is declared here.
-class CLuaHtmlView
+// ILuaFunction: the dual interface of CLuaFunction. IID {D5AB3A9C-C462-48BA-A430-34B227340E42} (008164a8, compared by
+// InterfaceSupportsErrorInfo 00417e20; the first COM map entry 0080ec14 has the same GUID at 0080ec44, offset 4).
+// Its vtable is the second one of CComObject<CLuaFunction> (0080ebd8: IUnknown and IDispatchImpl slots 0..6, then
+// its own methods 0042e0c0 (slot 7: four VARIANTs by value and a VARIANT* result, calls the FunctionRef) and 0042da40
+// (slot 8: returns E_NOTIMPL)). Those two methods have no proven names or parameter types and are not declared here.
+struct __declspec(uuid("D5AB3A9C-C462-48BA-A430-34B227340E42")) __declspec(novtable) ILuaFunction : public IDispatch
+{
+};
+
+// CLuaFunction: the COM object a Lua function is handed to the page through (RTTI CComObject<CLuaFunction> 0087cfe0
+// / 0087cdd0, CComContainedObject / CComAggObject / CComCoClass<CLuaFunction, &CLSID_LuaFunction> type descriptors).
+// sizeof 0x3c: CComCreator<CComObject<CLuaFunction> >::CreateInstance 004186d0 news 0x3c, calls the constructor
+// 004179b0, then stores the vptrs 0080ec00 (+0) and 0080ebd8 (+4). The COM map 0080ec14 is ILuaFunction (+4),
+// IDispatch (+4), ISupportErrorInfo (+0). Constructor 004179b0: m_dwRef +8 = 0, shared_ptr +0xc/+0x10 = 0,
+// FunctionRef() +0x14 (vptrs 0080ebc8 / 0080ebd0, functionId +0x34 = 0), +0x38 = 0. Destructor 00417120:
+// ~FunctionRef 00594470 on +0x14, then the shared_ptr release (+0x10); ~CComObject 00417ea0 stores m_dwRef =
+// 0xc0000001 and unlocks the module. AddRef (00417e70, ICF-shared) is a plain `inc [this+8]`: single-threaded model.
+// CComCoClass and IDispatchImpl<ILuaFunction, ...> add no data and are not declared (their GUID arguments are not
+// derived). Only DHTMLWindow::doSetCallback 00417b40 uses the layout natively (function, +0x14).
+class CLuaFunction : public ATL::CComObjectRootEx<ATL::CComSingleThreadModel>, public ISupportErrorInfo,
+                     public ILuaFunction
+{
+public:
+    // +0x0c: Invoke 0042e0c0 copies it as a shared_ptr (px +0xc, pn +0x10 with a lock xadd on pn+4) and asks
+    // ServiceProvider::create<ScriptContext> 0042dfd0 with its pointer.
+    boost::shared_ptr<RBX::Instance> context;   // INFERRED: pointee type (only the shared_ptr shape and the
+                                                //   ServiceProvider lookup are visible)
+    RBX::Lua::FunctionRef function;             // +0x14 (assigned by DHTMLWindow::doSetCallback 00417b40)
+    // +0x38: Invoke 0042e0c0 passes it to Security::Impersonator::Impersonator(Identities) 0042bc10.
+    RBX::Security::Identities identity;         // INFERRED: name (type from the Impersonator argument)
+};
+
+// CLuaHtmlView: the CHtmlView-based browser view of the HtmlWindow. Only partially declared: the image keeps no
+// constructor, vtable or RTTI for it (only its nested Binder has RTTI), so neither its exact base nor its size is
+// derivable. Members used by native code: the CLuaFunction pointer at +0xfc (DHTMLWindow::doSetCallback 00417b89:
+// `mov ecx, [view + 0xfc]; add ecx, 0x14`, no null test). Members not declared yet: +0x100/+0x104 (read by
+// 0042b60b / 0042b618, copied by 0042cb5a as a shared_ptr-like pair), +0x108 / +0x10c (0042c1ee / 0042c43e) and the
+// container at +0x110 (+0x124; 0042b63e, 0042caba).
+class CLuaHtmlView : public CHtmlView
 {
 public:
     class Binder;
+
+    // Methods the DHTMLWindow workers call (bodies in the CLuaHtmlView unit, not recovered natively; names
+    // provisional, taken from the reflected DHTMLWindow members that post them).
+    void setBody(const char* html);             // 0042ae50 (ret 4), called by DHTMLWindow::doSetBody 00417cc9
+    // 0042c8c0 (ret 0x10): GetHtmlDocument, the element by id, then a new Binder (0x34) bound to the property.
+    void bindElement(boost::shared_ptr<RBX::Instance> object, const RBX::Reflection::PropertyDescriptor& property,
+                     const char* htmlElementId);    // called by DHTMLWindow::doBind 00417d98
+    void unbindAll();                           // 0042b5f0 (plain ret), bound by DHTMLWindow::unbind 0041b665
+
+    // INFERRED: +0xf4..+0xfb. CHtmlView (mfc90) is 0xf4 bytes (CDeclarationView.h, CSecureHtmlView.h) and the
+    // CLuaFunction pointer is at +0xfc, so the class has 8 more bytes there that no surviving code reads or writes.
+    DWORD unknownF4;                            // +0xf4 INFERRED
+    DWORD unknownF8;                            // +0xf8 INFERRED
+    CLuaFunction* callback;                     // +0xfc INFERRED: pointee type (CComObject<CLuaFunction> starts at
+                                                //   CLuaFunction; +0x14 is its FunctionRef)
 };
 
 // sizeof 0x34: the binding view (0042c8c0) news 0x34 before the constructor 0042c0d0 (vptr 00810654). Constructor
