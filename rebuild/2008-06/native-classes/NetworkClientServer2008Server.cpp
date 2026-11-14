@@ -8,8 +8,13 @@
 // 1/1 mapped addresses byte-exact | 0 unproved | no mapped strings | by auto
 // <<< native-status | src 308c979a | roc native-status --write
 #include "Network/Server2008.h"
+#include "Network/ClientProxy2008.h"
+#include "Network/Players.h"
 #include "Network/API.h"
 #include "script/Script.h"
+#include "util/standardout.h"
+#include "MessageIdentifiers.h"
+#include <boost/bind.hpp>
 
 namespace RBX
 {
@@ -58,6 +63,66 @@ namespace RBX
 				else
 					names.insert(script->getScriptId().toString());
 			}
+		}
+
+		// 004a4100 (donor Server.cpp onServiceProvider; 2008 adds the script-name bookkeeping through registerScript
+		// 004a31d0: visitDescendents 004a27e0 and event_descendentAdded.connect 004a3340, group 10)
+		void Server::onServiceProvider(const ServiceProvider* oldProvider, const ServiceProvider* newProvider)
+		{
+			if (oldProvider)
+			{
+				players->setConnection(NULL);
+
+				if (rakPeer->IsActive())
+					rakPeer->Shutdown(1000);
+
+				removeAllChildren();
+
+				players.reset();
+
+				connection.disconnect();
+			}
+
+			Peer::onServiceProvider(oldProvider, newProvider);
+
+			if (newProvider)
+			{
+				players = shared_from(newProvider->create<Players>());
+
+				players->setConnection(peerInterface());
+
+				newProvider->visitDescendents(boost::bind(&Server::registerScript, this, _1));
+				connection = Instance::event_descendentAdded.connect(const_cast<ServiceProvider*>(newProvider), boost::bind(&Server::registerScript, this, _1), 10);
+			}
+		}
+
+		// 004a4dc0 (donor Server.cpp OnReceive; strings 00823bcc "New connection from %s\n", "Server::OnReceive packet
+		// %d: %s"; create<ClientProxy> 004a21c0, setParent 0055a8f0, sendTop 004a2ac0, fire 0049d2b0 on 00970ebc)
+		PluginReceiveResult Server::OnReceive(RakPeerInterface* peer, Packet* packet)
+		{
+			PluginReceiveResult result = PluginInterface::OnReceive(peer, packet);
+			if (result != RR_CONTINUE_PROCESSING)
+				return result;
+
+			if (packet->data[0] == ID_NEW_INCOMING_CONNECTION)
+			{
+				try
+				{
+					StandardOut::singleton()->print(MESSAGE_INFO, "New connection from %s\n", packet->systemAddress.ToString());
+
+					boost::shared_ptr<ClientProxy> proxy = Creatable<Instance>::create<ClientProxy>(packet->systemAddress, this);
+					proxy->setParent(this);
+					proxy->sendTop();
+
+					event_IncommingConnection.fire(this, packet->systemAddress.ToString(), proxy);
+				}
+				catch (std::exception& e)
+				{
+					StandardOut::singleton()->print(MESSAGE_ERROR, "Server::OnReceive packet %d: %s", packet->data[0], e.what());
+				}
+			}
+
+			return RR_CONTINUE_PROCESSING;
 		}
 	}
 }

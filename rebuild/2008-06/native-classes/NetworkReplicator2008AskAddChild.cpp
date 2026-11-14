@@ -1,3 +1,4 @@
+// native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /D_AFXDLL /DNDEBUG /D_MBCS /I{headers}/../../../tools/rbxgs/Client/Network/raknet30/Source
 // 2008-06 native Peer::askAddChild / Server::askAddChild (inactive): the two dynamic_cast checks that need the
 // native 2008 Replicator / Server::ClientProxy type (their RTTI type descriptors 00938db4 / 009398dc). Peer and
 // Server are declared in native-headers/Network/{Peer,Server}2008.h (record_native_network_client_server2008.py,

@@ -1,3 +1,4 @@
+// native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /D_AFXDLL /DNDEBUG /D_MBCS /I{headers}/../../../tools/rbxgs/Client/Network/raknet30/Source /fp:fast
 // 2008-06 native RBX::Network::Peer::onEvent(const RunService*, Heartbeat) 004add50 (inactive), the Peer Listener
 // <RunService, Heartbeat> vtable 0082488c slot 0, declared by the read-only native-headers/Network/Peer2008.h.
 // Verified by tests/record_native_app_unit4ac.py. Body (target bytes): tick = G3D::System::getTick() 005083d0 +

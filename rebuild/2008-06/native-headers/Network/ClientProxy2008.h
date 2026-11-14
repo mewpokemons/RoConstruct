@@ -34,6 +34,9 @@ namespace RBX
 		public:
 			ClientProxy(SystemAddress address, Server* server);                    // 004a1ed0 (open)
 			virtual ~ClientProxy();                                                 // 004a18c0 (open)
+			// 004a2ac0 (donor Server::ClientProxy::sendTop; open: it reads Replicator members past +0x2b90). Server::OnReceive
+			// 004a4dc0 calls it non-virtually on the create<ClientProxy> 004a21c0 result.
+			void sendTop();
 		};
 	}
 }
