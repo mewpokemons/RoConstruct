@@ -70,6 +70,24 @@ namespace RBX
 	public:
 		void replaceSky(Sky* newSky);                   // 005e0650
 
+		// Inline const getters (donor shape). Readers: ViewRbxGfx::suppressSkybox 004d9c90 reads skyParameters +0x130,
+		// ambientTop +0x228, ambientBottom +0x234, clearColor +0x244 and shadowColor +0x254.
+		const G3D::LightingParameters& getSkyParameters() const { return skyParameters; }
+		G3D::Color3 getAmbientTop() const { return ambientTop; }
+		G3D::Color3 getAmbientBottom() const { return ambientBottom; }
+		G3D::Color4 getClearColor() const { return clearColor; }
+		G3D::Color4 getShadowColor() const { return shadowColor; }
+
+		// 005e2030 (placeholder name in the registry): compares/stores the Color4 at +0x254, raises the "ShadowColor"
+		// PropDescriptor 0097aa58 (initializer 007f6b40), fires event_LightingChanged(false), then
+		// RunService::invalidateRunViews. Not recovered yet; named after the field it writes.
+		void setShadowColor(G3D::Color4 value);
+		// 005e2540: registry name ?setClearColor3@Lighting@RBX@@QAEXVColor3@G3D@@@Z (a relocation-derived name; the
+		// binary binds it as the setter of the "ShadowColor" PropDescriptor 007f6b40). Calls 005e2030 with alpha 1.
+		void setClearColor3(G3D::Color3 value);
+		void setTime(const boost::posix_time::time_duration& value);   // 005e2570 (not recovered yet)
+		void setMinutesAfterMidnight(double value);     // 005e26e0
+
 		G3D::Vector3 getMoonPosition();                 // 005df4d0
 		G3D::Vector3 getSunPosition();                  // 005df500
 		std::string getTimeStr() const;                 // 005e0be0

@@ -67,6 +67,19 @@ namespace RBX
 		return (skyParameters.physicallyCorrect) ? skyParameters.trueSunPosition : skyParameters.sunPosition;
 	}
 
+	// 005e2540: by-value Color4(value, 1) (fld1 into +0xc), then setShadowColor 005e2030; ret 0xc.
+	void Lighting::setClearColor3(G3D::Color3 value)
+	{
+		setShadowColor(G3D::Color4(value, 1.0f));
+	}
+
+	// 005e26e0 ("SetMinutesAfterMidnight" BoundFuncDesc 0097a938, initializer 007f6b10): value * 60.0 (0083df30),
+	// __ftol2_sse, seconds -> ticks (__allmul by 1000000), setTime 005e2570.
+	void Lighting::setMinutesAfterMidnight(double value)
+	{
+		setTime(boost::posix_time::seconds(value * 60.0));
+	}
+
 	void Lighting::replaceSky(Sky* newSky)
 	{
 		while (Sky* currentSky = findFirstChildOfType<Sky>())
