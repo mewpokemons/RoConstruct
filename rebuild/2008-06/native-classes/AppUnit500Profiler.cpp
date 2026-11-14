@@ -1,6 +1,7 @@
+// native-flags: /O2 /Ob2 /Oy /GF /GS- /EHsc /MD /D_AFXDLL /DNDEBUG /D_MBCS /fp:fast
 // 2008-06 native RenderLib Profiler.cpp unit (inactive): RBX::Render::SpecData and its helpers, 00501180..00501c2f.
-// Layout and evidence: native-headers/AppUnit500/RenderSpecData.h. GetCyclesDifference (00501400) is an inline-asm
-// rdtsc body and is not built here. Profile: document-swap flags + /fp:fast (without it the constructor spills the
+// Layout and evidence: native-headers/AppUnit500/RenderSpecData.h. GetCyclesDifference (00501400) is built here with its
+// original rdtsc inline asm. Profile: document-swap flags + /fp:fast (without it the constructor spills the
 // conditional shaderModel through a stack temporary: 333 / 325 B).
 #include "AppUnit500/RenderSpecData.h"
 #include <GLG3D/GLCaps.h>
@@ -32,6 +33,42 @@ namespace RBX
 				return 1.2f;
 
 			return 1.0f;
+		}
+
+		// 00501400: KWSys-derived CPU cycle counter. The original body is inline asm (rdtsc around the delay call,
+		// visible verbatim at 0050142d..00501445) inside SEH __try/__except (_except_handler3 frame).
+		G3D::int64 GetCyclesDifference(DELAY_FUNC DelayFunction, unsigned uiParameter)
+		{
+			unsigned t0Hi, t0Lo;
+			unsigned t1Hi, t1Lo;
+
+			__try
+			{
+				__asm
+				{
+					rdtsc
+					mov esi, eax
+					mov edi, edx
+
+					push uiParameter
+					call DelayFunction
+
+					pop ebx
+
+					rdtsc
+					mov t1Hi, edx
+					mov t1Lo, eax
+					mov t0Hi, edi
+					mov t0Lo, esi
+				}
+			}
+			__except (1)
+			{
+				return 0;
+			}
+
+			// The target multiplies t1Hi through _allmul (006a16d0) by 0x100000000 and shift-subtracts t0Hi.
+			return ((G3D::int64)t1Hi * 0x100000000 + t1Lo) - (((G3D::int64)t0Hi << 32) + t0Lo);
 		}
 
 		static void Delay(unsigned time)
