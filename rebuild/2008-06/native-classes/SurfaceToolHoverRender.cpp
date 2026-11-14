@@ -7,16 +7,8 @@
 #include "AppDraw/DrawAdorn.h"
 
 namespace RBX {
-void SurfaceTool::onMouseHover(const UIEvent& input) {
-    PartInstance* part;
-    surface = getSurface(input, part, surfaceId);
-    partInstance = shared_from(surface ? part : NULL);
-}
-
-void SurfaceTool::render3dAdorn(Adorn* adorn) {
-    if (partInstance)
-        DrawAdorn::partSurface(partInstance->getPart(), surfaceId, adorn, G3D::Color4(G3D::Color3::orange(), 1.0f));
-}
+// SurfaceTool::onMouseHover (00619e50) and SurfaceTool::render3dAdorn (00619c30) are defined once, in
+// SurfaceToolInteractions.cpp with their binary neighbour onMouseDown 00619f00 (all byte-exact there).
 
 // 00677630 (identity registry ?partSurface@DrawAdorn@RBX@@SAXABVPart@2@HPAVAdorn@2@ABVColor4@G3D@@@Z; it directly
 // follows the AppDraw range 006770b0..00677629 of DrawPartAdorn.cpp, which does not define it, and no other native
