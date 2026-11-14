@@ -8,6 +8,7 @@
 namespace RBX {
 inline const G3D::Vector3& PartInstance::getPartSizeXml() const { return primitive.getGeometry()->getGridSize(); }
 inline const G3D::CoordinateFrame& PartInstance::getCoordinateFrame() const { return primitive.getCoordinateFrame(); }
+// 0059e150
 bool PartInstance::resize(NormalId normal,int amount) {
  if(amount==0)return false;
  G3D::Vector3 oldSize=getPartSizeXml();
@@ -26,7 +27,7 @@ bool PartInstance::resize(NormalId normal,int amount) {
  G3D::CoordinateFrame desired(oldFrame.rotation,t);
  setCoordinateFrame(desired);
  {G3D::Vector3 finalSize=uiToXmlSize(newUiSize); setPartSizeXml(finalSize);}
- join();
+ safeMove(); // 0059e33e calls 0059b4f0 ?safeMove@PartInstance@RBX@@AAEXXZ (not join 00598c90)
  if(Math::fuzzyEq(getCoordinateFrame(),desired,0.00001f,0.00001f))return true;
  setCoordinateFrame(oldFrame); setPartSizeXml(oldSize); return false;
 }

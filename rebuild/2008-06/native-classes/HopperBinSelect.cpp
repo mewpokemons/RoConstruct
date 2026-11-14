@@ -29,10 +29,11 @@
 
 namespace RBX
 {
-	// Defined in native-classes/Hopper.cpp (00979d18). Proposal: drop `static` there so this unit can link to it.
+	// Defined with external linkage in native-classes/Hopper.cpp (00979d18); the original is one Hopper unit, split
+	// here, so this declaration only names the Hopper.cpp object (no Hopper.h declaration exists).
 	extern Reflection::SignalDesc<HopperBin, void(boost::shared_ptr<Instance>)> desc_Selected;
-	// Defined in native-classes/Hopper.cpp (`static`, dynamic initializer 007f5df0; setTextureId passes 00979cbc to
-	// raisePropertyChanged). Same proposal as desc_Selected: drop `static` there so this unit can link to it.
+	// Defined with external linkage in native-classes/Hopper.cpp (00979cbc, dynamic initializer 007f5df0;
+	// setTextureId passes it to raisePropertyChanged).
 	extern Reflection::PropDescriptor<BackpackItem, TextureId> desc_TextureId;
 
 	// 005cfcd0 (vtable slot render2d; donor tools/rbxgs v8datamodel/Hopper.cpp body). TopMenuBar::render2d 00574050,
@@ -43,7 +44,9 @@ namespace RBX
 	// NEAR MISS (249/251 bytes): the only difference is the drawFont2D vtable load. The target computes the slot
 	// address early (`mov edi, [esi]; add edi, 0x34` before the Color4::zero call, then `mov edx, [edi]`); this unit
 	// emits `mov edx, [edi + 0x34]` (and the `je` target moves by 2). Rejected variants: (1) G3D::Color4::clear()
-	// (donor) and (2) G3D::Color4::zero() (registry name of 007baf10): identical output. Kept zero().
+	// (donor) and (2) G3D::Color4::zero() (registry name of 007baf10): identical output. Kept zero(). (3) 2026-11-14:
+	// a named `G3D::Color4 color(G3D::Color3::white())` local (as in HealthHud / BackpackItemRender): identical
+	// output. Parked after three rejected variants.
 	void StarterPackService::render2d(Adorn* adorn)
 	{
 		TopMenuBar::render2d(adorn);
